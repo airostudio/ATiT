@@ -2,7 +2,7 @@
 /*
 Plugin Name: Airo WooCommerce CSV Wizard
 Description: Wizard-style CSV importer for WooCommerce products with image checks, progress bar, and logging, tailored for Valley of the Dolls.
-Version: 1.4.0
+Version: 2.0.0
 Author: Airo Studio
 */
 
@@ -19,16 +19,13 @@ class Airo_WC_CSV_Wizard {
 
     public function __construct() {
         add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
-        // Fix Ali2Woo select2 error on this page
+        add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_styles' ) );
         add_action( 'admin_enqueue_scripts', array( $this, 'maybe_shim_select2' ) );
-        // Make sure WordPress allows CSV uploads
         add_filter( 'upload_mimes', array( $this, 'allow_csv_uploads' ) );
     }
 
     /**
      * Get the airo_uploads directory path dynamically.
-     *
-     * @return string
      */
     private function get_airo_uploads_dir() {
         $uploads = wp_get_upload_dir();
@@ -46,21 +43,825 @@ class Airo_WC_CSV_Wizard {
         );
     }
 
+    /**
+     * Enqueue custom styles for the wizard.
+     */
+    public function enqueue_styles( $hook ) {
+        if ( empty( $_GET['page'] ) || $_GET['page'] !== self::PAGE_SLUG ) {
+            return;
+        }
+
+        wp_enqueue_style(
+            'airo-csv-wizard-styles',
+            false,
+            array(),
+            '2.0.0'
+        );
+
+        $custom_css = $this->get_custom_css();
+        wp_add_inline_style( 'airo-csv-wizard-styles', $custom_css );
+    }
+
+    /**
+     * Get the custom CSS for the wizard interface.
+     */
+    private function get_custom_css() {
+        return '
+        /* =============================================
+           AIRO CSV WIZARD - MODERN UI STYLES
+           Neutral color palette with great UX
+           ============================================= */
+
+        :root {
+            --airo-bg: #f8f9fa;
+            --airo-card-bg: #ffffff;
+            --airo-border: #e5e7eb;
+            --airo-border-light: #f0f0f0;
+            --airo-text-primary: #1f2937;
+            --airo-text-secondary: #6b7280;
+            --airo-text-muted: #9ca3af;
+            --airo-primary: #4f46e5;
+            --airo-primary-hover: #4338ca;
+            --airo-primary-light: #eef2ff;
+            --airo-success: #10b981;
+            --airo-success-light: #d1fae5;
+            --airo-warning: #f59e0b;
+            --airo-warning-light: #fef3c7;
+            --airo-error: #ef4444;
+            --airo-error-light: #fee2e2;
+            --airo-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --airo-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+            --airo-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+            --airo-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+            --airo-radius: 8px;
+            --airo-radius-lg: 12px;
+            --airo-transition: all 0.2s ease;
+        }
+
+        .airo-wizard-wrap {
+            max-width: 960px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+
+        /* Header */
+        .airo-wizard-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .airo-wizard-header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--airo-text-primary);
+            margin: 0 0 8px 0;
+            letter-spacing: -0.5px;
+        }
+
+        .airo-wizard-header p {
+            color: var(--airo-text-secondary);
+            font-size: 15px;
+            margin: 0;
+        }
+
+        /* Step Progress Navigation */
+        .airo-steps-nav {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 40px;
+            padding: 0;
+            list-style: none;
+            gap: 0;
+        }
+
+        .airo-step-item {
+            display: flex;
+            align-items: center;
+            position: relative;
+        }
+
+        .airo-step-item:not(:last-child)::after {
+            content: "";
+            width: 60px;
+            height: 2px;
+            background: var(--airo-border);
+            margin: 0 8px;
+        }
+
+        .airo-step-item.completed:not(:last-child)::after {
+            background: var(--airo-primary);
+        }
+
+        .airo-step-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .airo-step-number {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 14px;
+            transition: var(--airo-transition);
+            border: 2px solid var(--airo-border);
+            background: var(--airo-card-bg);
+            color: var(--airo-text-muted);
+        }
+
+        .airo-step-item.active .airo-step-number {
+            background: var(--airo-primary);
+            border-color: var(--airo-primary);
+            color: #fff;
+            box-shadow: 0 0 0 4px var(--airo-primary-light);
+        }
+
+        .airo-step-item.completed .airo-step-number {
+            background: var(--airo-primary);
+            border-color: var(--airo-primary);
+            color: #fff;
+        }
+
+        .airo-step-item.completed .airo-step-number::before {
+            content: "\\2713";
+        }
+
+        .airo-step-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--airo-text-muted);
+            text-align: center;
+            max-width: 80px;
+        }
+
+        .airo-step-item.active .airo-step-label {
+            color: var(--airo-primary);
+            font-weight: 600;
+        }
+
+        .airo-step-item.completed .airo-step-label {
+            color: var(--airo-text-secondary);
+        }
+
+        /* Cards */
+        .airo-card {
+            background: var(--airo-card-bg);
+            border: 1px solid var(--airo-border);
+            border-radius: var(--airo-radius-lg);
+            padding: 32px;
+            margin-bottom: 24px;
+            box-shadow: var(--airo-shadow-sm);
+            transition: var(--airo-transition);
+        }
+
+        .airo-card:hover {
+            box-shadow: var(--airo-shadow);
+        }
+
+        .airo-card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--airo-border-light);
+        }
+
+        .airo-card-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: var(--airo-radius);
+            background: var(--airo-primary-light);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--airo-primary);
+            font-size: 20px;
+        }
+
+        .airo-card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--airo-text-primary);
+            margin: 0;
+        }
+
+        .airo-card-subtitle {
+            font-size: 13px;
+            color: var(--airo-text-secondary);
+            margin: 4px 0 0 0;
+        }
+
+        /* Form Elements */
+        .airo-form-group {
+            margin-bottom: 20px;
+        }
+
+        .airo-form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .airo-form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--airo-text-primary);
+            margin-bottom: 8px;
+        }
+
+        .airo-form-label .required {
+            color: var(--airo-error);
+        }
+
+        .airo-form-hint {
+            font-size: 13px;
+            color: var(--airo-text-secondary);
+            margin-top: 6px;
+            line-height: 1.5;
+        }
+
+        .airo-form-hint code {
+            background: var(--airo-bg);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: var(--airo-text-primary);
+        }
+
+        /* File Upload */
+        .airo-file-upload {
+            position: relative;
+            border: 2px dashed var(--airo-border);
+            border-radius: var(--airo-radius);
+            padding: 40px 24px;
+            text-align: center;
+            background: var(--airo-bg);
+            transition: var(--airo-transition);
+            cursor: pointer;
+        }
+
+        .airo-file-upload:hover {
+            border-color: var(--airo-primary);
+            background: var(--airo-primary-light);
+        }
+
+        .airo-file-upload input[type="file"] {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .airo-file-upload-icon {
+            font-size: 48px;
+            color: var(--airo-text-muted);
+            margin-bottom: 16px;
+        }
+
+        .airo-file-upload-text {
+            font-size: 15px;
+            color: var(--airo-text-primary);
+            margin-bottom: 4px;
+        }
+
+        .airo-file-upload-hint {
+            font-size: 13px;
+            color: var(--airo-text-secondary);
+        }
+
+        /* Select Dropdowns */
+        .airo-select {
+            width: 100%;
+            padding: 10px 14px;
+            font-size: 14px;
+            border: 1px solid var(--airo-border);
+            border-radius: var(--airo-radius);
+            background: var(--airo-card-bg);
+            color: var(--airo-text-primary);
+            transition: var(--airo-transition);
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3E%3Cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3E%3C/svg%3E");
+            background-position: right 10px center;
+            background-repeat: no-repeat;
+            background-size: 20px;
+            padding-right: 40px;
+        }
+
+        .airo-select:hover {
+            border-color: var(--airo-text-muted);
+        }
+
+        .airo-select:focus {
+            outline: none;
+            border-color: var(--airo-primary);
+            box-shadow: 0 0 0 3px var(--airo-primary-light);
+        }
+
+        /* Text Input */
+        .airo-input {
+            width: 100%;
+            padding: 10px 14px;
+            font-size: 14px;
+            border: 1px solid var(--airo-border);
+            border-radius: var(--airo-radius);
+            background: var(--airo-card-bg);
+            color: var(--airo-text-primary);
+            transition: var(--airo-transition);
+        }
+
+        .airo-input:hover {
+            border-color: var(--airo-text-muted);
+        }
+
+        .airo-input:focus {
+            outline: none;
+            border-color: var(--airo-primary);
+            box-shadow: 0 0 0 3px var(--airo-primary-light);
+        }
+
+        .airo-input::placeholder {
+            color: var(--airo-text-muted);
+        }
+
+        /* Radio & Checkbox Groups */
+        .airo-radio-group,
+        .airo-checkbox-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .airo-radio-item,
+        .airo-checkbox-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 14px 16px;
+            border: 1px solid var(--airo-border);
+            border-radius: var(--airo-radius);
+            cursor: pointer;
+            transition: var(--airo-transition);
+            background: var(--airo-card-bg);
+        }
+
+        .airo-radio-item:hover,
+        .airo-checkbox-item:hover {
+            border-color: var(--airo-primary);
+            background: var(--airo-primary-light);
+        }
+
+        .airo-radio-item.selected,
+        .airo-checkbox-item.selected {
+            border-color: var(--airo-primary);
+            background: var(--airo-primary-light);
+        }
+
+        .airo-radio-item input,
+        .airo-checkbox-item input {
+            margin-top: 2px;
+            accent-color: var(--airo-primary);
+        }
+
+        .airo-radio-label,
+        .airo-checkbox-label {
+            flex: 1;
+        }
+
+        .airo-radio-label strong,
+        .airo-checkbox-label strong {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--airo-text-primary);
+            margin-bottom: 2px;
+        }
+
+        .airo-radio-label span,
+        .airo-checkbox-label span {
+            font-size: 13px;
+            color: var(--airo-text-secondary);
+        }
+
+        /* Buttons */
+        .airo-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: var(--airo-radius);
+            cursor: pointer;
+            transition: var(--airo-transition);
+            text-decoration: none;
+            border: none;
+        }
+
+        .airo-btn-primary {
+            background: var(--airo-primary);
+            color: #fff;
+        }
+
+        .airo-btn-primary:hover {
+            background: var(--airo-primary-hover);
+            transform: translateY(-1px);
+            box-shadow: var(--airo-shadow-md);
+        }
+
+        .airo-btn-secondary {
+            background: var(--airo-card-bg);
+            color: var(--airo-text-primary);
+            border: 1px solid var(--airo-border);
+        }
+
+        .airo-btn-secondary:hover {
+            background: var(--airo-bg);
+            border-color: var(--airo-text-muted);
+        }
+
+        .airo-btn-lg {
+            padding: 14px 32px;
+            font-size: 15px;
+        }
+
+        .airo-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .airo-btn-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 32px;
+        }
+
+        /* Mapping Table */
+        .airo-mapping-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .airo-mapping-table th,
+        .airo-mapping-table td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--airo-border-light);
+        }
+
+        .airo-mapping-table th {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--airo-text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            background: var(--airo-bg);
+        }
+
+        .airo-mapping-table td {
+            font-size: 14px;
+            color: var(--airo-text-primary);
+        }
+
+        .airo-mapping-table tr:hover td {
+            background: var(--airo-bg);
+        }
+
+        .airo-mapping-table .airo-select {
+            width: auto;
+            min-width: 200px;
+        }
+
+        .airo-field-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            font-size: 12px;
+            font-weight: 500;
+            background: var(--airo-bg);
+            border-radius: 20px;
+            color: var(--airo-text-secondary);
+        }
+
+        .airo-field-badge.required {
+            background: var(--airo-warning-light);
+            color: #92400e;
+        }
+
+        /* Divider */
+        .airo-divider {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin: 32px 0;
+            color: var(--airo-text-muted);
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .airo-divider::before,
+        .airo-divider::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background: var(--airo-border);
+        }
+
+        /* Alerts */
+        .airo-alert {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 16px;
+            border-radius: var(--airo-radius);
+            margin-bottom: 24px;
+        }
+
+        .airo-alert-icon {
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .airo-alert-content {
+            flex: 1;
+        }
+
+        .airo-alert-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .airo-alert-error {
+            background: var(--airo-error-light);
+            color: #991b1b;
+        }
+
+        .airo-alert-success {
+            background: var(--airo-success-light);
+            color: #065f46;
+        }
+
+        .airo-alert-warning {
+            background: var(--airo-warning-light);
+            color: #92400e;
+        }
+
+        /* Progress Section */
+        .airo-progress-section {
+            text-align: center;
+            padding: 20px 0;
+        }
+
+        .airo-progress-bar-container {
+            width: 100%;
+            height: 12px;
+            background: var(--airo-bg);
+            border-radius: 100px;
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+
+        .airo-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--airo-primary), #818cf8);
+            border-radius: 100px;
+            transition: width 0.3s ease;
+            position: relative;
+        }
+
+        .airo-progress-bar::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(
+                90deg,
+                transparent,
+                rgba(255, 255, 255, 0.3),
+                transparent
+            );
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .airo-progress-text {
+            font-size: 14px;
+            color: var(--airo-text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .airo-progress-percent {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--airo-text-primary);
+            margin-bottom: 4px;
+        }
+
+        /* Stats Cards */
+        .airo-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-top: 32px;
+        }
+
+        .airo-stat-card {
+            background: var(--airo-card-bg);
+            border: 1px solid var(--airo-border);
+            border-radius: var(--airo-radius);
+            padding: 20px;
+            text-align: center;
+        }
+
+        .airo-stat-card.created {
+            border-color: var(--airo-success);
+            border-width: 2px;
+        }
+
+        .airo-stat-card.updated {
+            border-color: var(--airo-primary);
+            border-width: 2px;
+        }
+
+        .airo-stat-card.skipped {
+            border-color: var(--airo-warning);
+            border-width: 2px;
+        }
+
+        .airo-stat-number {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .airo-stat-card.created .airo-stat-number {
+            color: var(--airo-success);
+        }
+
+        .airo-stat-card.updated .airo-stat-number {
+            color: var(--airo-primary);
+        }
+
+        .airo-stat-card.skipped .airo-stat-number {
+            color: var(--airo-warning);
+        }
+
+        .airo-stat-label {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--airo-text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* Product Lists */
+        .airo-product-lists {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-top: 24px;
+        }
+
+        .airo-product-list {
+            background: var(--airo-bg);
+            border-radius: var(--airo-radius);
+            padding: 16px;
+        }
+
+        .airo-product-list-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--airo-border);
+        }
+
+        .airo-product-list-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .airo-product-list.created .airo-product-list-dot {
+            background: var(--airo-success);
+        }
+
+        .airo-product-list.updated .airo-product-list-dot {
+            background: var(--airo-primary);
+        }
+
+        .airo-product-list.skipped .airo-product-list-dot {
+            background: var(--airo-warning);
+        }
+
+        .airo-product-list-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--airo-text-secondary);
+        }
+
+        .airo-product-list ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .airo-product-list li {
+            padding: 8px 0;
+            font-size: 13px;
+            color: var(--airo-text-primary);
+            border-bottom: 1px solid var(--airo-border-light);
+        }
+
+        .airo-product-list li:last-child {
+            border-bottom: none;
+        }
+
+        /* Empty State */
+        .airo-empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--airo-text-muted);
+        }
+
+        .airo-empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .airo-wizard-wrap {
+                padding: 0 12px;
+            }
+
+            .airo-steps-nav {
+                flex-wrap: wrap;
+            }
+
+            .airo-step-item:not(:last-child)::after {
+                width: 30px;
+            }
+
+            .airo-stats-grid,
+            .airo-product-lists {
+                grid-template-columns: 1fr;
+            }
+
+            .airo-card {
+                padding: 20px;
+            }
+
+            .airo-btn-group {
+                flex-direction: column;
+            }
+        }
+        ';
+    }
+
     public function render_wizard() {
         if ( ! current_user_can( 'manage_woocommerce' ) ) {
             wp_die( 'You do not have permission to access this page.' );
         }
 
-        if ( ! class_exists( 'WooCommerce' ) ) {
-            echo '<div class="notice notice-error"><p>WooCommerce is not active. Please activate WooCommerce first.</p></div>';
-            return;
-        }
-
         $step = isset( $_GET['step'] ) ? intval( $_GET['step'] ) : 1;
         $step = max( 1, min( 4, $step ) );
 
-        echo '<div class="wrap">';
-        echo '<h1>WooCommerce CSV Product Wizard</h1>';
+        echo '<div class="airo-wizard-wrap">';
+
+        // Header
+        echo '<div class="airo-wizard-header">';
+        echo '<h1>CSV Product Wizard</h1>';
+        echo '<p>Import your products into WooCommerce with ease</p>';
+        echo '</div>';
+
+        // Check WooCommerce
+        if ( ! class_exists( 'WooCommerce' ) ) {
+            $this->render_alert( 'error', 'WooCommerce Required', 'WooCommerce is not active. Please activate WooCommerce first.' );
+            echo '</div>';
+            return;
+        }
 
         $this->render_steps_nav( $step );
 
@@ -82,25 +883,52 @@ class Airo_WC_CSV_Wizard {
         echo '</div>';
     }
 
+    private function render_alert( $type, $title, $message ) {
+        $icons = array(
+            'error'   => '&#10006;',
+            'success' => '&#10004;',
+            'warning' => '&#9888;',
+        );
+        $icon = isset( $icons[ $type ] ) ? $icons[ $type ] : '';
+
+        echo '<div class="airo-alert airo-alert-' . esc_attr( $type ) . '">';
+        echo '<span class="airo-alert-icon">' . $icon . '</span>';
+        echo '<div class="airo-alert-content">';
+        echo '<div class="airo-alert-title">' . esc_html( $title ) . '</div>';
+        echo '<div>' . esc_html( $message ) . '</div>';
+        echo '</div>';
+        echo '</div>';
+    }
+
     private function render_steps_nav( $current_step ) {
         $steps = array(
-            1 => 'Upload / Select File',
+            1 => 'Upload',
             2 => 'Map Fields',
-            3 => 'Import Options',
-            4 => 'Run Import',
+            3 => 'Options',
+            4 => 'Import',
         );
 
-        echo '<ol class="aio-wizard-steps" style="display:flex;gap:12px;margin:15px 0;padding:0;list-style:none;">';
+        echo '<ol class="airo-steps-nav">';
         foreach ( $steps as $step => $label ) {
-            $style = 'padding:6px 10px;border-radius:4px;';
+            $class = 'airo-step-item';
             if ( $step === $current_step ) {
-                $style .= 'background:#2271b1;color:#fff;font-weight:bold;';
+                $class .= ' active';
             } elseif ( $step < $current_step ) {
-                $style .= 'background:#d1e7ff;';
-            } else {
-                $style .= 'background:#f1f1f1;';
+                $class .= ' completed';
             }
-            echo '<li style="' . esc_attr( $style ) . '">' . intval( $step ) . '. ' . esc_html( $label ) . '</li>';
+
+            echo '<li class="' . esc_attr( $class ) . '">';
+            echo '<div class="airo-step-content">';
+            echo '<div class="airo-step-number">';
+            if ( $step < $current_step ) {
+                // Checkmark shown via CSS
+            } else {
+                echo intval( $step );
+            }
+            echo '</div>';
+            echo '<span class="airo-step-label">' . esc_html( $label ) . '</span>';
+            echo '</div>';
+            echo '</li>';
         }
         echo '</ol>';
     }
@@ -116,17 +944,14 @@ class Airo_WC_CSV_Wizard {
             $has_uploaded_file = isset( $_FILES['csv_file'] ) && ! empty( $_FILES['csv_file']['name'] );
             $selected_existing = isset( $_POST['existing_csv'] ) ? sanitize_text_field( wp_unslash( $_POST['existing_csv'] ) ) : '';
 
-            // If a file was uploaded, prefer that.
             if ( $has_uploaded_file ) {
                 $file = $_FILES['csv_file'];
 
-                // If PHP upload error, show a specific message
                 if ( ! empty( $file['error'] ) && UPLOAD_ERR_OK !== (int) $file['error'] ) {
                     $msg = $this->human_upload_error( (int) $file['error'] );
-                    echo '<div class="notice notice-error"><p>Upload error (code ' . intval( $file['error'] ) . '): ' . esc_html( $msg ) . '</p></div>';
+                    $this->render_alert( 'error', 'Upload Error', $msg );
                 } elseif ( empty( $file['tmp_name'] ) ) {
-                    // No tmp_name usually also means an upload error or too-large file
-                    echo '<div class="notice notice-error"><p>Upload failed before reaching WordPress. This is usually caused by the file being larger than the server\'s upload limit.</p></div>';
+                    $this->render_alert( 'error', 'Upload Failed', 'Upload failed before reaching WordPress. The file may be larger than the server limit.' );
                 } else {
                     if ( ! function_exists( 'wp_handle_upload' ) ) {
                         require_once ABSPATH . 'wp-admin/includes/file.php';
@@ -135,10 +960,9 @@ class Airo_WC_CSV_Wizard {
                     $uploaded = wp_handle_upload( $file, array( 'test_form' => false ) );
 
                     if ( isset( $uploaded['error'] ) ) {
-                        echo '<div class="notice notice-error"><p>Upload error: ' . esc_html( $uploaded['error'] ) . '</p></div>';
+                        $this->render_alert( 'error', 'Upload Error', $uploaded['error'] );
                     } else {
                         $file_path = $uploaded['file'];
-
                         $url = add_query_arg(
                             array(
                                 'page' => self::PAGE_SLUG,
@@ -148,20 +972,18 @@ class Airo_WC_CSV_Wizard {
                             admin_url( 'admin.php' )
                         );
                         echo '<meta http-equiv="refresh" content="0;url=' . esc_url( $url ) . '">';
-                        echo '<p>Redirecting to mapping step...</p>';
+                        echo '<div class="airo-card"><p>Redirecting to mapping step...</p></div>';
                         return;
                     }
                 }
 
-            // If no upload, but an existing CSV was selected from airo_uploads
             } elseif ( $selected_existing !== '' ) {
 
                 $file_path = $this->build_airo_csv_path( $selected_existing );
 
                 if ( ! $file_path || ! file_exists( $file_path ) ) {
-                    echo '<div class="notice notice-error"><p>The selected CSV file could not be found in <code>airo_uploads</code>.</p></div>';
+                    $this->render_alert( 'error', 'File Not Found', 'The selected CSV file could not be found.' );
                 } else {
-                    // Go straight to mapping with that file
                     $url = add_query_arg(
                         array(
                             'page' => self::PAGE_SLUG,
@@ -171,72 +993,68 @@ class Airo_WC_CSV_Wizard {
                         admin_url( 'admin.php' )
                     );
                     echo '<meta http-equiv="refresh" content="0;url=' . esc_url( $url ) . '">';
-                    echo '<p>Using existing file from airo_uploads and redirecting to mapping step...</p>';
+                    echo '<div class="airo-card"><p>Redirecting to mapping step...</p></div>';
                     return;
                 }
 
             } else {
-                echo '<div class="notice notice-error"><p>Please upload a CSV file or select one already in the <code>airo_uploads</code> folder.</p></div>';
+                $this->render_alert( 'error', 'No File Selected', 'Please upload a CSV file or select one from the server.' );
             }
         }
 
         $existing_csv_files = $this->get_existing_csv_files();
 
-        echo '<h2>Step 1: Upload or Select CSV File</h2>';
         ?>
         <form method="post" enctype="multipart/form-data">
             <?php wp_nonce_field( 'airo_csv_upload', 'airo_csv_upload_nonce' ); ?>
 
-            <h3>Option A: Upload a new CSV file</h3>
-            <table class="form-table">
-                <tr>
-                    <th scope="row"><label for="csv_file">CSV File</label></th>
-                    <td>
-                        <input
-                            type="file"
-                            name="csv_file"
-                            id="csv_file"
-                            accept=".csv,text/csv"
-                        />
-                        <p class="description">
-                            Save your spreadsheet as <strong>CSV (Comma delimited)</strong> in Excel (or similar),
-                            then upload the <code>.csv</code> file here.
-                        </p>
-                    </td>
-                </tr>
-            </table>
+            <div class="airo-card">
+                <div class="airo-card-header">
+                    <div class="airo-card-icon">&#128194;</div>
+                    <div>
+                        <h2 class="airo-card-title">Upload CSV File</h2>
+                        <p class="airo-card-subtitle">Drag and drop or click to browse</p>
+                    </div>
+                </div>
 
-            <h3>Option B: Use a CSV already on the server</h3>
-            <table class="form-table">
-                <tr>
-                    <th scope="row">Existing CSV in <code>wp-content/uploads/airo_uploads/</code></th>
-                    <td>
-                        <?php if ( ! empty( $existing_csv_files ) ) : ?>
-                            <select name="existing_csv">
-                                <option value="">— Do not use existing file —</option>
-                                <?php foreach ( $existing_csv_files as $csv ) : ?>
-                                    <option value="<?php echo esc_attr( $csv ); ?>">
-                                        <?php echo esc_html( $csv ); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                            <p class="description">
-                                These are CSV files already present in:<br>
-                                <code><?php echo esc_html( $airo_uploads_dir ); ?></code><br>
-                                You can upload files via FTP/SFTP/cPanel into that folder and choose them here.
-                            </p>
-                        <?php else : ?>
-                            <p class="description">
-                                No <code>.csv</code> files found in:<br>
-                                <code><?php echo esc_html( $airo_uploads_dir ); ?></code><br>
-                                Upload a CSV above or place one into this folder via FTP/SFTP and refresh.
-                            </p>
-                        <?php endif; ?>
-                    </td>
-                </tr>
-            </table>
+                <div class="airo-file-upload">
+                    <input type="file" name="csv_file" id="csv_file" accept=".csv,text/csv" />
+                    <div class="airo-file-upload-icon">&#128206;</div>
+                    <div class="airo-file-upload-text">Drop your CSV file here or click to browse</div>
+                    <div class="airo-file-upload-hint">Supports .csv files exported from Excel, Google Sheets, etc.</div>
+                </div>
+            </div>
 
-            <?php submit_button( 'Continue to Mapping →' ); ?>
+            <?php if ( ! empty( $existing_csv_files ) ) : ?>
+            <div class="airo-divider">or select from server</div>
+
+            <div class="airo-card">
+                <div class="airo-card-header">
+                    <div class="airo-card-icon">&#128451;</div>
+                    <div>
+                        <h2 class="airo-card-title">Server Files</h2>
+                        <p class="airo-card-subtitle">CSV files already uploaded via FTP/SFTP</p>
+                    </div>
+                </div>
+
+                <div class="airo-form-group">
+                    <label class="airo-form-label">Select a file</label>
+                    <select name="existing_csv" class="airo-select">
+                        <option value="">Choose a file...</option>
+                        <?php foreach ( $existing_csv_files as $csv ) : ?>
+                            <option value="<?php echo esc_attr( $csv ); ?>"><?php echo esc_html( $csv ); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <p class="airo-form-hint">Files from: <code><?php echo esc_html( $airo_uploads_dir ); ?></code></p>
+                </div>
+            </div>
+            <?php endif; ?>
+
+            <div class="airo-btn-group">
+                <button type="submit" class="airo-btn airo-btn-primary airo-btn-lg">
+                    Continue to Field Mapping &#8594;
+                </button>
+            </div>
         </form>
         <?php
     }
@@ -261,12 +1079,8 @@ class Airo_WC_CSV_Wizard {
         }
     }
 
-    /**
-     * Build a full path to a CSV file inside the airo_uploads directory,
-     * using only the basename from the form (no arbitrary paths).
-     */
     private function build_airo_csv_path( $basename ) {
-        $basename = basename( $basename ); // strip any path tricks
+        $basename = basename( $basename );
         if ( $basename === '' ) {
             return '';
         }
@@ -274,9 +1088,6 @@ class Airo_WC_CSV_Wizard {
         return $dir . $basename;
     }
 
-    /**
-     * Get a list of CSV filenames in the airo_uploads directory.
-     */
     private function get_existing_csv_files() {
         $files = array();
         $dir   = $this->get_airo_uploads_dir();
@@ -305,14 +1116,16 @@ class Airo_WC_CSV_Wizard {
         $file_path = $this->sanitize_file_path( $file_path );
 
         if ( ! $file_path || ! file_exists( $file_path ) ) {
-            echo '<div class="notice notice-error"><p>CSV file not found. Please go back and upload/select again.</p></div>';
-            echo '<p><a class="button" href="' . esc_url( add_query_arg( array( 'page' => self::PAGE_SLUG, 'step' => 1 ), admin_url( 'admin.php' ) ) ) . '">← Back to Step 1</a></p>';
+            $this->render_alert( 'error', 'File Not Found', 'CSV file not found. Please go back and upload again.' );
+            echo '<div class="airo-btn-group">';
+            echo '<a class="airo-btn airo-btn-secondary" href="' . esc_url( add_query_arg( array( 'page' => self::PAGE_SLUG, 'step' => 1 ), admin_url( 'admin.php' ) ) ) . '">&#8592; Back to Upload</a>';
+            echo '</div>';
             return;
         }
 
         $headers = $this->get_csv_headers( $file_path );
         if ( empty( $headers ) ) {
-            echo '<div class="notice notice-error"><p>Could not read header row from CSV file.</p></div>';
+            $this->render_alert( 'error', 'Invalid CSV', 'Could not read header row from CSV file.' );
             return;
         }
 
@@ -337,81 +1150,115 @@ class Airo_WC_CSV_Wizard {
                 admin_url( 'admin.php' )
             );
             echo '<meta http-equiv="refresh" content="0;url=' . esc_url( $url ) . '">';
-            echo '<p>Saving mapping and moving to options...</p>';
+            echo '<div class="airo-card"><p>Saving mapping and moving to options...</p></div>';
             return;
         }
 
-        echo '<h2>Step 2: Map CSV Columns to WooCommerce Fields</h2>';
-        echo '<p>Select which CSV columns correspond to each WooCommerce product field.</p>';
-
-        $this->render_mapping_form( $file_path, $headers );
-    }
-
-    private function render_mapping_form( $file_path, $headers ) {
         $headers_for_select = array( '' => '-- Not Mapped --' );
         foreach ( $headers as $index => $h ) {
             $headers_for_select[ $index ] = $h;
         }
+
+        $fields = array(
+            'name'              => array( 'label' => 'Product Name', 'required' => true ),
+            'sku'               => array( 'label' => 'SKU', 'required' => false ),
+            'description'       => array( 'label' => 'Description', 'required' => false ),
+            'short_description' => array( 'label' => 'Short Description', 'required' => false ),
+            'regular_price'     => array( 'label' => 'Regular Price', 'required' => false ),
+            'sale_price'        => array( 'label' => 'Sale Price', 'required' => false ),
+            'categories'        => array( 'label' => 'Categories', 'required' => false ),
+            'stock_quantity'    => array( 'label' => 'Stock Quantity', 'required' => false ),
+            'status'            => array( 'label' => 'Status', 'required' => false ),
+            'images'            => array( 'label' => 'Images', 'required' => false ),
+            'id'                => array( 'label' => 'Product ID (for updates)', 'required' => false ),
+        );
 
         ?>
         <form method="post">
             <?php wp_nonce_field( 'airo_csv_mapping', 'airo_csv_mapping_nonce' ); ?>
             <input type="hidden" name="file" value="<?php echo esc_attr( $file_path ); ?>" />
 
-            <h3>Core Product Fields</h3>
-            <table class="form-table">
-                <?php
-                $this->render_mapping_row( 'Product ID (for updating by ID)', 'id', $headers_for_select );
-                $this->render_mapping_row( 'Product Name', 'name', $headers_for_select );
-                $this->render_mapping_row( 'Description', 'description', $headers_for_select );
-                $this->render_mapping_row( 'Short Description', 'short_description', $headers_for_select );
-                $this->render_mapping_row( 'Regular Price', 'regular_price', $headers_for_select );
-                $this->render_mapping_row( 'Sale Price', 'sale_price', $headers_for_select );
-                $this->render_mapping_row( 'SKU', 'sku', $headers_for_select );
-                $this->render_mapping_row( 'Product Categories', 'categories', $headers_for_select );
-                $this->render_mapping_row( 'Stock Quantity', 'stock_quantity', $headers_for_select );
-                $this->render_mapping_row( 'Status', 'status', $headers_for_select );
-                $this->render_mapping_row( 'Images (URLs or filenames, separated by comma/pipe)', 'images', $headers_for_select );
-                ?>
-            </table>
+            <div class="airo-card">
+                <div class="airo-card-header">
+                    <div class="airo-card-icon">&#128279;</div>
+                    <div>
+                        <h2 class="airo-card-title">Map CSV Columns</h2>
+                        <p class="airo-card-subtitle">Match your CSV columns to WooCommerce product fields</p>
+                    </div>
+                </div>
 
-            <h3>Custom Meta Fields</h3>
-            <p>Optionally map up to 3 custom meta fields.</p>
-            <table class="form-table">
-                <?php for ( $i = 1; $i <= 3; $i++ ) : ?>
-                    <tr>
-                        <th scope="row">Custom Meta <?php echo intval( $i ); ?></th>
-                        <td>
-                            <label>Meta Key:
-                                <input type="text" name="custom_meta[<?php echo intval( $i ); ?>][key]" style="width:200px;" />
-                            </label>
-                            &nbsp;&nbsp;
-                            <label>Column:
-                                <select name="custom_meta[<?php echo intval( $i ); ?>][column]">
+                <table class="airo-mapping-table">
+                    <thead>
+                        <tr>
+                            <th>WooCommerce Field</th>
+                            <th>CSV Column</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ( $fields as $key => $field ) : ?>
+                        <tr>
+                            <td>
+                                <?php echo esc_html( $field['label'] ); ?>
+                                <?php if ( $field['required'] ) : ?>
+                                    <span class="airo-field-badge required">Required</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <select name="mapping[<?php echo esc_attr( $key ); ?>]" class="airo-select">
                                     <?php foreach ( $headers_for_select as $index => $label ) : ?>
                                         <option value="<?php echo esc_attr( $index ); ?>"><?php echo esc_html( $label ); ?></option>
                                     <?php endforeach; ?>
                                 </select>
-                            </label>
-                        </td>
-                    </tr>
-                <?php endfor; ?>
-            </table>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
 
-            <?php submit_button( 'Continue to Import Options →' ); ?>
+            <div class="airo-card">
+                <div class="airo-card-header">
+                    <div class="airo-card-icon">&#9881;</div>
+                    <div>
+                        <h2 class="airo-card-title">Custom Meta Fields</h2>
+                        <p class="airo-card-subtitle">Map additional fields to product meta (optional)</p>
+                    </div>
+                </div>
+
+                <table class="airo-mapping-table">
+                    <thead>
+                        <tr>
+                            <th>Meta Key</th>
+                            <th>CSV Column</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php for ( $i = 1; $i <= 3; $i++ ) : ?>
+                        <tr>
+                            <td>
+                                <input type="text" name="custom_meta[<?php echo intval( $i ); ?>][key]" class="airo-input" placeholder="e.g., _custom_field" style="width: 200px;" />
+                            </td>
+                            <td>
+                                <select name="custom_meta[<?php echo intval( $i ); ?>][column]" class="airo-select">
+                                    <?php foreach ( $headers_for_select as $index => $label ) : ?>
+                                        <option value="<?php echo esc_attr( $index ); ?>"><?php echo esc_html( $label ); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </td>
+                        </tr>
+                        <?php endfor; ?>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="airo-btn-group">
+                <a class="airo-btn airo-btn-secondary" href="<?php echo esc_url( add_query_arg( array( 'page' => self::PAGE_SLUG, 'step' => 1 ), admin_url( 'admin.php' ) ) ); ?>">&#8592; Back</a>
+                <button type="submit" class="airo-btn airo-btn-primary airo-btn-lg">
+                    Continue to Options &#8594;
+                </button>
+            </div>
         </form>
         <?php
-    }
-
-    private function render_mapping_row( $label, $field_key, $options ) {
-        echo '<tr>';
-        echo '<th scope="row"><label>' . esc_html( $label ) . '</label></th>';
-        echo '<td><select name="mapping[' . esc_attr( $field_key ) . ']">';
-        foreach ( $options as $index => $opt_label ) {
-            echo '<option value="' . esc_attr( $index ) . '">' . esc_html( $opt_label ) . '</option>';
-        }
-        echo '</select></td>';
-        echo '</tr>';
     }
 
     /* --------------------------
@@ -420,7 +1267,7 @@ class Airo_WC_CSV_Wizard {
     private function step_options() {
         $state = $this->get_state_from_request();
         if ( ! $state ) {
-            echo '<div class="notice notice-error"><p>Wizard state lost. Please start again.</p></div>';
+            $this->render_alert( 'error', 'Session Lost', 'Wizard state lost. Please start again.' );
             return;
         }
 
@@ -438,7 +1285,6 @@ class Airo_WC_CSV_Wizard {
 
             $encoded = base64_encode( wp_json_encode( $state ) );
 
-            // Add nonce for step 4 CSRF protection
             $url = wp_nonce_url(
                 add_query_arg(
                     array(
@@ -451,87 +1297,117 @@ class Airo_WC_CSV_Wizard {
                 'airo_csv_run_import'
             );
             echo '<meta http-equiv="refresh" content="0;url=' . esc_url( $url ) . '">';
-            echo '<p>Saving options and moving to import...</p>';
+            echo '<div class="airo-card"><p>Saving options and starting import...</p></div>';
             return;
         }
-
-        echo '<h2>Step 3: Import Options</h2>';
-        echo '<p>Configure how products should be created/updated.</p>';
 
         ?>
         <form method="post">
             <?php wp_nonce_field( 'airo_csv_options', 'airo_csv_options_nonce' ); ?>
             <input type="hidden" name="state" value="<?php echo esc_attr( base64_encode( wp_json_encode( $state ) ) ); ?>" />
 
-            <h3>Mode</h3>
-            <table class="form-table">
-                <tr>
-                    <th scope="row">Create / Update</th>
-                    <td>
-                        <label><input type="radio" name="mode" value="create_update" checked /> Create &amp; Update existing products</label><br />
-                        <label><input type="radio" name="mode" value="create_only" /> Create new products only</label><br />
-                        <label><input type="radio" name="mode" value="update_only" /> Update existing products only</label>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row">Match existing products by</th>
-                    <td>
-                        <label><input type="radio" name="match_by" value="sku" checked /> SKU</label><br />
-                        <label><input type="radio" name="match_by" value="id" /> Product ID (requires ID field mapped)</label>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row">Product Type</th>
-                    <td>
-                        <select name="product_type">
-                            <option value="simple">Simple Product</option>
-                        </select>
-                    </td>
-                </tr>
-            </table>
+            <div class="airo-card">
+                <div class="airo-card-header">
+                    <div class="airo-card-icon">&#9881;</div>
+                    <div>
+                        <h2 class="airo-card-title">Import Mode</h2>
+                        <p class="airo-card-subtitle">Choose how products should be handled</p>
+                    </div>
+                </div>
 
-            <h3>Categories &amp; Images</h3>
-            <table class="form-table">
-                <tr>
-                    <th scope="row">Category delimiter</th>
-                    <td>
-                        <select name="category_delim">
-                            <option value=",">Comma (,)</option>
-                            <option value="|">Pipe (|)</option>
-                            <option value=";">Semicolon (;)</option>
-                        </select>
-                        <p class="description">Used when splitting multiple categories from the mapped category column.</p>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row">Images</th>
-                    <td>
-                        <label>
-                            <input type="checkbox" name="download_images" value="1" checked />
-                            Download images from the <strong>Images</strong> column
+                <div class="airo-form-group">
+                    <label class="airo-form-label">Create / Update Behavior</label>
+                    <div class="airo-radio-group">
+                        <label class="airo-radio-item selected">
+                            <input type="radio" name="mode" value="create_update" checked onclick="this.parentElement.parentElement.querySelectorAll('.airo-radio-item').forEach(el => el.classList.remove('selected')); this.parentElement.classList.add('selected');" />
+                            <div class="airo-radio-label">
+                                <strong>Create &amp; Update</strong>
+                                <span>Create new products and update existing ones</span>
+                            </div>
                         </label>
-                        <p class="description">
-                            • If the value <code>starts with http</code>, it is treated as a full <strong>external URL</strong> and downloaded from there.<br>
-                            • If it does <em>not</em> start with <code>http</code>, it is treated as a <strong>filename</strong> under the Image Base URL (or the default <code>/wp-content/uploads/airo_uploads/</code>).<br>
-                            • Multiple images per product are supported (comma, pipe or semicolon separated). The first becomes the featured image; the rest go to the gallery.
-                        </p>
-                    </td>
-                </tr>
-                <tr>
-                    <th scope="row">Image base URL (for filenames)</th>
-                    <td>
-                        <input type="text" name="image_base_url" style="width:400px;" placeholder="<?php echo esc_attr( site_url( '/wp-content/uploads/airo_uploads/' ) ); ?>" />
-                        <p class="description">
-                            If left empty, the importer will default to:<br />
-                            <code><?php echo esc_html( site_url( '/wp-content/uploads/airo_uploads/' ) ); ?></code><br />
-                            Filenames like <code>image1.jpg</code> will be resolved relative to that folder.<br />
-                            <strong>Full URLs</strong> (starting with <code>http</code>) are always used as-is and can point to external sites/CDNs.
-                        </p>
-                    </td>
-                </tr>
-            </table>
+                        <label class="airo-radio-item">
+                            <input type="radio" name="mode" value="create_only" onclick="this.parentElement.parentElement.querySelectorAll('.airo-radio-item').forEach(el => el.classList.remove('selected')); this.parentElement.classList.add('selected');" />
+                            <div class="airo-radio-label">
+                                <strong>Create Only</strong>
+                                <span>Only create new products, skip existing ones</span>
+                            </div>
+                        </label>
+                        <label class="airo-radio-item">
+                            <input type="radio" name="mode" value="update_only" onclick="this.parentElement.parentElement.querySelectorAll('.airo-radio-item').forEach(el => el.classList.remove('selected')); this.parentElement.classList.add('selected');" />
+                            <div class="airo-radio-label">
+                                <strong>Update Only</strong>
+                                <span>Only update existing products, skip new ones</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
 
-            <?php submit_button( 'Run Import →' ); ?>
+                <div class="airo-form-group" style="margin-top: 24px;">
+                    <label class="airo-form-label">Match Existing Products By</label>
+                    <div class="airo-radio-group">
+                        <label class="airo-radio-item selected">
+                            <input type="radio" name="match_by" value="sku" checked onclick="this.parentElement.parentElement.querySelectorAll('.airo-radio-item').forEach(el => el.classList.remove('selected')); this.parentElement.classList.add('selected');" />
+                            <div class="airo-radio-label">
+                                <strong>SKU</strong>
+                                <span>Match products using their SKU (recommended)</span>
+                            </div>
+                        </label>
+                        <label class="airo-radio-item">
+                            <input type="radio" name="match_by" value="id" onclick="this.parentElement.parentElement.querySelectorAll('.airo-radio-item').forEach(el => el.classList.remove('selected')); this.parentElement.classList.add('selected');" />
+                            <div class="airo-radio-label">
+                                <strong>Product ID</strong>
+                                <span>Match by WordPress product ID (requires ID mapped)</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="airo-card">
+                <div class="airo-card-header">
+                    <div class="airo-card-icon">&#128247;</div>
+                    <div>
+                        <h2 class="airo-card-title">Categories &amp; Images</h2>
+                        <p class="airo-card-subtitle">Configure how categories and images are handled</p>
+                    </div>
+                </div>
+
+                <div class="airo-form-group">
+                    <label class="airo-form-label">Category Delimiter</label>
+                    <select name="category_delim" class="airo-select" style="width: 200px;">
+                        <option value=",">Comma (,)</option>
+                        <option value="|">Pipe (|)</option>
+                        <option value=";">Semicolon (;)</option>
+                    </select>
+                    <p class="airo-form-hint">Used when splitting multiple categories in a single cell</p>
+                </div>
+
+                <div class="airo-form-group" style="margin-top: 24px;">
+                    <label class="airo-checkbox-item selected">
+                        <input type="checkbox" name="download_images" value="1" checked onclick="this.parentElement.classList.toggle('selected', this.checked);" />
+                        <div class="airo-checkbox-label">
+                            <strong>Download Images</strong>
+                            <span>Automatically download and attach images from the Images column</span>
+                        </div>
+                    </label>
+                </div>
+
+                <div class="airo-form-group" style="margin-top: 24px;">
+                    <label class="airo-form-label">Image Base URL (for filenames)</label>
+                    <input type="text" name="image_base_url" class="airo-input" placeholder="<?php echo esc_attr( site_url( '/wp-content/uploads/airo_uploads/' ) ); ?>" />
+                    <p class="airo-form-hint">
+                        Leave empty to use the default: <code><?php echo esc_html( site_url( '/wp-content/uploads/airo_uploads/' ) ); ?></code><br />
+                        Full URLs (starting with <code>http</code>) in the CSV are always used as-is.
+                    </p>
+                </div>
+            </div>
+
+            <div class="airo-btn-group">
+                <a class="airo-btn airo-btn-secondary" href="javascript:history.back()">&#8592; Back</a>
+                <button type="submit" class="airo-btn airo-btn-primary airo-btn-lg">
+                    Start Import &#8594;
+                </button>
+            </div>
         </form>
         <?php
     }
@@ -540,16 +1416,17 @@ class Airo_WC_CSV_Wizard {
      * STEP 4: RUN IMPORT
      * -------------------------- */
     private function step_run() {
-        // CSRF protection - verify nonce
         if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( $_GET['_wpnonce'], 'airo_csv_run_import' ) ) {
-            echo '<div class="notice notice-error"><p>Security check failed. Please start again.</p></div>';
-            echo '<p><a class="button" href="' . esc_url( add_query_arg( array( 'page' => self::PAGE_SLUG, 'step' => 1 ), admin_url( 'admin.php' ) ) ) . '">← Back to Step 1</a></p>';
+            $this->render_alert( 'error', 'Security Error', 'Security check failed. Please start again.' );
+            echo '<div class="airo-btn-group">';
+            echo '<a class="airo-btn airo-btn-secondary" href="' . esc_url( add_query_arg( array( 'page' => self::PAGE_SLUG, 'step' => 1 ), admin_url( 'admin.php' ) ) ) . '">&#8592; Start Over</a>';
+            echo '</div>';
             return;
         }
 
         $state = $this->get_state_from_request();
         if ( ! $state ) {
-            echo '<div class="notice notice-error"><p>Wizard state lost. Please start again.</p></div>';
+            $this->render_alert( 'error', 'Session Lost', 'Wizard state lost. Please start again.' );
             return;
         }
 
@@ -559,83 +1436,127 @@ class Airo_WC_CSV_Wizard {
         $options     = isset( $state['options'] ) ? $state['options'] : array();
 
         if ( ! $file || ! file_exists( $file ) ) {
-            echo '<div class="notice notice-error"><p>CSV file not found.</p></div>';
+            $this->render_alert( 'error', 'File Not Found', 'CSV file not found.' );
             return;
         }
-
-        echo '<h2>Step 4: Run Import</h2>';
 
         $total_rows = $this->count_csv_rows( $file );
 
         ?>
-        <div id="airo-import-progress" style="max-width:900px;margin-top:20px;">
-            <div id="airo-import-progress-bar" style="width:100%;background:#f1f1f1;border-radius:4px;overflow:hidden;">
-                <div id="airo-import-progress-bar-inner" style="width:0%;height:22px;background:#2271b1;color:#fff;text-align:center;line-height:22px;font-size:11px;">0%</div>
+        <div class="airo-card">
+            <div class="airo-card-header">
+                <div class="airo-card-icon">&#128640;</div>
+                <div>
+                    <h2 class="airo-card-title">Importing Products</h2>
+                    <p class="airo-card-subtitle">Please wait while your products are being imported</p>
+                </div>
             </div>
-            <p id="airo-import-progress-text" style="margin-top:8px;">Starting import...</p>
-            <div style="display:flex;gap:20px;margin-top:15px;">
-                <div style="flex:1;">
-                    <strong>Created</strong>
-                    <ul id="airo-import-created-list" style="max-height:200px;overflow:auto;border:1px solid #ddd;padding:5px;margin-top:5px;background:#fff;"></ul>
+
+            <div class="airo-progress-section">
+                <div id="airo-progress-percent" class="airo-progress-percent">0%</div>
+                <div class="airo-progress-bar-container">
+                    <div id="airo-progress-bar" class="airo-progress-bar" style="width: 0%;"></div>
                 </div>
-                <div style="flex:1;">
-                    <strong>Updated</strong>
-                    <ul id="airo-import-updated-list" style="max-height:200px;overflow:auto;border:1px solid #ddd;padding:5px;margin-top:5px;background:#fff;"></ul>
+                <div id="airo-progress-text" class="airo-progress-text">Starting import...</div>
+            </div>
+
+            <div class="airo-stats-grid">
+                <div class="airo-stat-card created">
+                    <div id="airo-stat-created" class="airo-stat-number">0</div>
+                    <div class="airo-stat-label">Created</div>
                 </div>
-                <div style="flex:1;">
-                    <strong>Skipped</strong>
-                    <ul id="airo-import-skipped-list" style="max-height:200px;overflow:auto;border:1px solid #ddd;padding:5px;margin-top:5px;background:#fff;"></ul>
+                <div class="airo-stat-card updated">
+                    <div id="airo-stat-updated" class="airo-stat-number">0</div>
+                    <div class="airo-stat-label">Updated</div>
+                </div>
+                <div class="airo-stat-card skipped">
+                    <div id="airo-stat-skipped" class="airo-stat-number">0</div>
+                    <div class="airo-stat-label">Skipped</div>
+                </div>
+            </div>
+
+            <div class="airo-product-lists">
+                <div class="airo-product-list created">
+                    <div class="airo-product-list-header">
+                        <span class="airo-product-list-dot"></span>
+                        <span class="airo-product-list-title">Created Products</span>
+                    </div>
+                    <ul id="airo-list-created"></ul>
+                </div>
+                <div class="airo-product-list updated">
+                    <div class="airo-product-list-header">
+                        <span class="airo-product-list-dot"></span>
+                        <span class="airo-product-list-title">Updated Products</span>
+                    </div>
+                    <ul id="airo-list-updated"></ul>
+                </div>
+                <div class="airo-product-list skipped">
+                    <div class="airo-product-list-header">
+                        <span class="airo-product-list-dot"></span>
+                        <span class="airo-product-list-title">Skipped Products</span>
+                    </div>
+                    <ul id="airo-list-skipped"></ul>
                 </div>
             </div>
         </div>
 
         <script>
         window.airoUpdateProgress = function(done, total, created, updated, skipped, action, productName) {
-            var barInner = document.getElementById('airo-import-progress-bar-inner');
-            var text = document.getElementById('airo-import-progress-text');
-            if (!barInner || !text) return;
-
             var percent = total ? Math.round(done / total * 100) : 0;
             if (percent > 100) percent = 100;
-            barInner.style.width = percent + '%';
-            barInner.textContent = percent + '%';
 
-            text.textContent = done + ' / ' + total + ' processed – Created: ' + created + ', Updated: ' + updated + ', Skipped: ' + skipped;
+            document.getElementById('airo-progress-bar').style.width = percent + '%';
+            document.getElementById('airo-progress-percent').textContent = percent + '%';
+            document.getElementById('airo-progress-text').textContent = done + ' of ' + total + ' products processed';
+
+            document.getElementById('airo-stat-created').textContent = created;
+            document.getElementById('airo-stat-updated').textContent = updated;
+            document.getElementById('airo-stat-skipped').textContent = skipped;
 
             var listId = '';
-            if (action === 'created') listId = 'airo-import-created-list';
-            else if (action === 'updated') listId = 'airo-import-updated-list';
-            else if (action === 'skipped') listId = 'airo-import-skipped-list';
+            if (action === 'created') listId = 'airo-list-created';
+            else if (action === 'updated') listId = 'airo-list-updated';
+            else if (action === 'skipped') listId = 'airo-list-skipped';
 
             if (listId && productName) {
                 var list = document.getElementById(listId);
                 if (list) {
                     var li = document.createElement('li');
                     li.textContent = productName;
-                    list.appendChild(li);
+                    list.insertBefore(li, list.firstChild);
                 }
             }
         };
         </script>
         <?php
 
-        // Initialize log
         $this->init_log_file();
-
-        // Run import with live progress output
         $result = $this->run_import( $file, $mapping, $custom_meta, $options, $total_rows );
-
-        // Close log and get URL
         $this->close_log_file();
         $log_url = $this->get_log_file_url();
 
-        echo '<div class="notice notice-success" style="margin-top:20px;"><p>Import complete. Created: ' . intval( $result['created'] ) . ', Updated: ' . intval( $result['updated'] ) . ', Skipped: ' . intval( $result['skipped'] ) . '.</p></div>';
+        ?>
+        <div class="airo-card" style="margin-top: 24px;">
+            <div class="airo-alert airo-alert-success">
+                <span class="airo-alert-icon">&#10004;</span>
+                <div class="airo-alert-content">
+                    <div class="airo-alert-title">Import Complete!</div>
+                    <div>Successfully processed <?php echo intval( $result['created'] + $result['updated'] + $result['skipped'] ); ?> products.</div>
+                </div>
+            </div>
 
-        if ( ! empty( $log_url ) ) {
-            echo '<p><a class="button" href="' . esc_url( $log_url ) . '" target="_blank">Download Import Log</a></p>';
-        }
-
-        echo '<p><a class="button button-primary" href="' . esc_url( add_query_arg( array( 'page' => self::PAGE_SLUG, 'step' => 1 ), admin_url( 'admin.php' ) ) ) . '">Start New Import</a></p>';
+            <div class="airo-btn-group">
+                <?php if ( ! empty( $log_url ) ) : ?>
+                <a class="airo-btn airo-btn-secondary" href="<?php echo esc_url( $log_url ); ?>" target="_blank">
+                    &#128196; Download Log
+                </a>
+                <?php endif; ?>
+                <a class="airo-btn airo-btn-primary" href="<?php echo esc_url( add_query_arg( array( 'page' => self::PAGE_SLUG, 'step' => 1 ), admin_url( 'admin.php' ) ) ); ?>">
+                    &#8635; Start New Import
+                </a>
+            </div>
+        </div>
+        <?php
     }
 
     /* --------------------------
@@ -655,14 +1576,14 @@ class Airo_WC_CSV_Wizard {
         $image_base_url  = isset( $options['image_base_url'] ) ? $options['image_base_url'] : '';
 
         if ( ( $handle = fopen( $file_path, 'r' ) ) === false ) {
-            echo '<div class="notice notice-error"><p>Cannot open file.</p></div>';
+            $this->render_alert( 'error', 'File Error', 'Cannot open file.' );
             $this->log_line( 'ERROR: Cannot open CSV file.' );
             return compact( 'created', 'updated', 'skipped' );
         }
 
         $headers = fgetcsv( $handle, 0, ',' );
         if ( ! $headers ) {
-            echo '<div class="notice notice-error"><p>Empty or invalid CSV.</p></div>';
+            $this->render_alert( 'error', 'Invalid CSV', 'Empty or invalid CSV.' );
             fclose( $handle );
             $this->log_line( 'ERROR: CSV has no valid header row.' );
             return compact( 'created', 'updated', 'skipped' );
@@ -719,7 +1640,6 @@ class Airo_WC_CSV_Wizard {
             $images_index = $this->mapping_index( $mapping, 'images' );
             $images_raw   = $images_index !== null && isset( $row_data[ $images_index ] ) ? $row_data[ $images_index ] : '';
 
-            // find existing product
             $product_id = 0;
             if ( 'sku' === $match_by && $sku !== '' ) {
                 $product_id = wc_get_product_id_by_sku( $sku );
@@ -756,11 +1676,7 @@ class Airo_WC_CSV_Wizard {
                     continue;
                 }
 
-                if ( 'simple' === $product_type ) {
-                    $product = new WC_Product_Simple();
-                } else {
-                    $product = new WC_Product_Simple();
-                }
+                $product = new WC_Product_Simple();
             }
 
             if ( ! $product ) {
@@ -771,13 +1687,11 @@ class Airo_WC_CSV_Wizard {
                 continue;
             }
 
-            // set basic fields
             $product->set_name( $name );
             $product->set_description( $desc );
             $product->set_short_description( $short_desc );
             $product->set_status( $status );
 
-            // Handle SKU with try-catch for duplicate SKU errors
             if ( $sku !== '' ) {
                 try {
                     $product->set_sku( $sku );
@@ -821,17 +1735,14 @@ class Airo_WC_CSV_Wizard {
                 continue;
             }
 
-            // categories
             if ( $categories_raw !== '' ) {
                 $this->assign_categories_with_delim( $saved_id, $categories_raw, $category_delim );
             }
 
-            // images
             if ( $images_raw !== '' && $download_images ) {
                 $this->handle_images_for_product( $saved_id, $images_raw, $image_base_url );
             }
 
-            // custom meta
             if ( ! empty( $custom_meta ) ) {
                 foreach ( $custom_meta as $meta_item ) {
                     if ( empty( $meta_item['key'] ) || $meta_item['column'] === '' ) {
@@ -897,7 +1808,6 @@ class Airo_WC_CSV_Wizard {
         if ( ! file_exists( $log_dir ) ) {
             wp_mkdir_p( $log_dir );
 
-            // Add security files to prevent direct access
             $index_file = trailingslashit( $log_dir ) . 'index.php';
             if ( ! file_exists( $index_file ) ) {
                 file_put_contents( $index_file, '<?php // Silence is golden' );
@@ -952,14 +1862,6 @@ class Airo_WC_CSV_Wizard {
     /* --------------------------
      * MISC HELPERS
      * -------------------------- */
-
-    /**
-     * Sanitize and validate file path to prevent path traversal attacks.
-     * Uses realpath() to resolve the actual path before comparison.
-     *
-     * @param string $path The file path to sanitize.
-     * @return string The sanitized path, or empty string if invalid.
-     */
     private function sanitize_file_path( $path ) {
         $uploads = wp_get_upload_dir();
         $basedir = realpath( $uploads['basedir'] );
@@ -968,15 +1870,12 @@ class Airo_WC_CSV_Wizard {
             return '';
         }
 
-        // Resolve the actual path (handles ../ and symlinks)
         $resolved = realpath( $path );
 
-        // If realpath returns false, file doesn't exist or path is invalid
         if ( ! $resolved ) {
             return '';
         }
 
-        // Ensure the resolved path is within the uploads directory
         if ( strpos( $resolved, $basedir ) !== 0 ) {
             return '';
         }
@@ -1044,15 +1943,7 @@ class Airo_WC_CSV_Wizard {
         return $state;
     }
 
-    /**
-     * Assign categories to a product using only the specified delimiter.
-     *
-     * @param int    $product_id     The product ID.
-     * @param string $categories_raw The raw categories string from CSV.
-     * @param string $delim          The delimiter to use for splitting.
-     */
     private function assign_categories_with_delim( $product_id, $categories_raw, $delim ) {
-        // Only use the selected delimiter - do not replace other characters
         $valid_delims = array( ',', '|', ';' );
         if ( ! in_array( $delim, $valid_delims, true ) ) {
             $delim = ',';
@@ -1085,14 +1976,6 @@ class Airo_WC_CSV_Wizard {
         }
     }
 
-    /**
-     * Handle images with availability checks and default base URL.
-     *
-     * External images:
-     * - If CSV value starts with "http", it is used as-is as an external URL.
-     * Filenames:
-     * - Otherwise it is treated as a filename under $base_url (or default airo_uploads).
-     */
     private function handle_images_for_product( $product_id, $images_raw, $base_url ) {
         $separators   = array( ',', '|', ';' );
         $images_clean = str_replace( $separators, ',', $images_raw );
@@ -1102,7 +1985,6 @@ class Airo_WC_CSV_Wizard {
             return;
         }
 
-        // Default base URL if none provided in options
         if ( empty( $base_url ) ) {
             $base_url = site_url( '/wp-content/uploads/airo_uploads/' );
         }
@@ -1120,12 +2002,10 @@ class Airo_WC_CSV_Wizard {
 
             $url = $img;
 
-            // If CSV value is not a full URL, treat it as a filename in the airo_uploads folder (or provided base URL)
             if ( strpos( $img, 'http' ) !== 0 ) {
                 $url = trailingslashit( $base_url ) . ltrim( $img, '/\\' );
             }
 
-            // Test if image URL is available and is an image
             $response = wp_remote_head( $url, array( 'timeout' => 10 ) );
             if ( is_wp_error( $response ) ) {
                 $this->log_line( 'Image HEAD request error for product ID ' . $product_id . ': ' . $url . ' (' . $response->get_error_message() . ')' );
@@ -1144,7 +2024,6 @@ class Airo_WC_CSV_Wizard {
                 continue;
             }
 
-            // Download the image
             $tmp = download_url( $url, 30 );
             if ( is_wp_error( $tmp ) ) {
                 $this->log_line( 'Image download error for product ID ' . $product_id . ': ' . $url . ' (' . $tmp->get_error_message() . ')' );
@@ -1179,16 +2058,11 @@ class Airo_WC_CSV_Wizard {
         }
     }
 
-    /* --------------------------
-     * SELECT2 SHIM (fix Ali2Woo JS error)
-     * -------------------------- */
     public function maybe_shim_select2( $hook ) {
-        // Only run on our wizard page
         if ( empty( $_GET['page'] ) || $_GET['page'] !== self::PAGE_SLUG ) {
             return;
         }
 
-        // Inject a tiny no-op select2 shim after jQuery has loaded
         $inline = <<<JS
 jQuery(function($){
     if (!$.fn.select2) {
@@ -1201,9 +2075,6 @@ JS;
         wp_add_inline_script( 'jquery', $inline );
     }
 
-    /* --------------------------
-     * ALLOW CSV UPLOADS
-     * -------------------------- */
     public function allow_csv_uploads( $mimes ) {
         $mimes['csv'] = 'text/csv';
         return $mimes;
