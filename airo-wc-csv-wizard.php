@@ -17,6 +17,17 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Airo_URL_Product_Extractor {
 
     /**
+     * User agents to rotate through for better success rate
+     */
+    private $user_agents = array(
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15',
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    );
+
+    /**
      * Extract product data from a URL
      * @param string $url The product URL to extract data from
      * @return array|WP_Error Product data array or error
@@ -27,28 +38,11 @@ class Airo_URL_Product_Extractor {
             return new WP_Error( 'invalid_url', 'Invalid URL provided.' );
         }
 
-        // Fetch the page content
-        $response = wp_remote_get( $url, array(
-            'timeout'    => 30,
-            'user-agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'headers'    => array(
-                'Accept'          => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Accept-Language' => 'en-US,en;q=0.5',
-            ),
-        ) );
+        // Try to fetch with different strategies
+        $html = $this->fetch_url( $url );
 
-        if ( is_wp_error( $response ) ) {
-            return $response;
-        }
-
-        $status_code = wp_remote_retrieve_response_code( $response );
-        if ( $status_code !== 200 ) {
-            return new WP_Error( 'http_error', 'Failed to fetch URL. Status: ' . $status_code );
-        }
-
-        $html = wp_remote_retrieve_body( $response );
-        if ( empty( $html ) ) {
-            return new WP_Error( 'empty_response', 'Empty response from URL.' );
+        if ( is_wp_error( $html ) ) {
+            return $html;
         }
 
         // Try extraction methods in order of reliability
@@ -75,6 +69,126 @@ class Airo_URL_Product_Extractor {
         }
 
         return $product;
+    }
+
+    /**
+     * Fetch URL content with anti-bot measures
+     */
+    private function fetch_url( $url ) {
+        $parsed = parse_url( $url );
+        $host = isset( $parsed['host'] ) ? $parsed['host'] : '';
+
+        // Randomize user agent
+        $user_agent = $this->user_agents[ array_rand( $this->user_agents ) ];
+
+        // Build comprehensive headers to mimic real browser
+        $headers = array(
+            'Accept'             => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+            'Accept-Language'    => 'en-US,en;q=0.9',
+            'Accept-Encoding'    => 'gzip, deflate, br',
+            'Cache-Control'      => 'max-age=0',
+            'Connection'         => 'keep-alive',
+            'DNT'                => '1',
+            'Sec-CH-UA'          => '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+            'Sec-CH-UA-Mobile'   => '?0',
+            'Sec-CH-UA-Platform' => '"Windows"',
+            'Sec-Fetch-Dest'     => 'document',
+            'Sec-Fetch-Mode'     => 'navigate',
+            'Sec-Fetch-Site'     => 'none',
+            'Sec-Fetch-User'     => '?1',
+            'Upgrade-Insecure-Requests' => '1',
+        );
+
+        // First attempt with full headers
+        $response = wp_remote_get( $url, array(
+            'timeout'     => 30,
+            'redirection' => 5,
+            'sslverify'   => false,
+            'user-agent'  => $user_agent,
+            'headers'     => $headers,
+        ) );
+
+        // Check for success
+        if ( ! is_wp_error( $response ) ) {
+            $status_code = wp_remote_retrieve_response_code( $response );
+            if ( $status_code === 200 ) {
+                $body = wp_remote_retrieve_body( $response );
+                if ( ! empty( $body ) ) {
+                    return $body;
+                }
+            }
+
+            // Handle specific status codes
+            if ( $status_code === 403 ) {
+                // Try again with different approach - simpler headers
+                return $this->fetch_url_simple( $url );
+            }
+
+            if ( $status_code === 503 ) {
+                return new WP_Error( 'service_unavailable', 'Site returned 503. May have rate limiting or anti-bot protection (Cloudflare).' );
+            }
+
+            if ( $status_code >= 400 ) {
+                return new WP_Error( 'http_error', "Failed to fetch URL. HTTP Status: {$status_code}. Site may block automated requests." );
+            }
+        }
+
+        if ( is_wp_error( $response ) ) {
+            return new WP_Error( 'fetch_error', 'Connection failed: ' . $response->get_error_message() );
+        }
+
+        return new WP_Error( 'empty_response', 'Empty response from URL.' );
+    }
+
+    /**
+     * Simpler fetch attempt for sites that reject complex headers
+     */
+    private function fetch_url_simple( $url ) {
+        // Try with minimal headers - some servers reject too many headers
+        $response = wp_remote_get( $url, array(
+            'timeout'     => 30,
+            'redirection' => 5,
+            'sslverify'   => false,
+            'user-agent'  => 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+            'headers'     => array(
+                'Accept' => 'text/html',
+            ),
+        ) );
+
+        if ( ! is_wp_error( $response ) ) {
+            $status_code = wp_remote_retrieve_response_code( $response );
+            if ( $status_code === 200 ) {
+                $body = wp_remote_retrieve_body( $response );
+                if ( ! empty( $body ) ) {
+                    return $body;
+                }
+            }
+        }
+
+        // Final attempt - try as a generic crawler
+        $response = wp_remote_get( $url, array(
+            'timeout'     => 30,
+            'redirection' => 5,
+            'sslverify'   => false,
+            'user-agent'  => 'Mozilla/5.0 (compatible; WooCommerce Product Importer)',
+        ) );
+
+        if ( ! is_wp_error( $response ) ) {
+            $status_code = wp_remote_retrieve_response_code( $response );
+            if ( $status_code === 200 ) {
+                return wp_remote_retrieve_body( $response );
+            }
+
+            // Provide helpful error message
+            $error_msg = "Site blocks automated requests (HTTP {$status_code}). ";
+            $error_msg .= "This site may use Cloudflare, bot protection, or require JavaScript. ";
+            $error_msg .= "Try: 1) Use a CSV export instead, 2) Contact site for API access, ";
+            $error_msg .= "3) Manually copy product data.";
+
+            return new WP_Error( 'blocked', $error_msg );
+        }
+
+        return new WP_Error( 'fetch_failed', 'Could not connect to URL: ' . ( is_wp_error( $response ) ? $response->get_error_message() : 'Unknown error' ) );
     }
 
     /**
