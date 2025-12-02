@@ -1530,10 +1530,23 @@ class Airo_WC_CSV_Wizard {
                     <ul style="margin: 10px 0 0 20px;">
                         <?php foreach ( $results as $result ) : ?>
                             <?php if ( ! $result['success'] ) : ?>
-                                <li><code><?php echo esc_html( $result['url'] ); ?></code> - <?php echo esc_html( $result['error'] ); ?></li>
+                                <li style="margin-bottom: 8px;">
+                                    <code><?php echo esc_html( $result['url'] ); ?></code><br>
+                                    <span style="color: #666; font-size: 12px;"><?php echo esc_html( $result['error'] ); ?></span>
+                                </li>
                             <?php endif; ?>
                         <?php endforeach; ?>
                     </ul>
+                    <div style="margin-top: 15px; padding: 12px; background: #fff8e5; border-radius: 4px;">
+                        <strong>Tips for blocked sites:</strong>
+                        <ul style="margin: 8px 0 0 20px; font-size: 13px;">
+                            <li>Try specific product URLs instead of category/homepage</li>
+                            <li>Sites with Cloudflare/bot protection may not work with server-side extraction</li>
+                            <li>Check if the site offers a product feed, CSV export, or API</li>
+                            <li>For WooCommerce sites, try: <code>/wp-json/wc/v3/products</code> (requires auth)</li>
+                            <li>For Shopify sites, try: <code>/products.json</code></li>
+                        </ul>
+                    </div>
                 </div>
                 <?php endif; ?>
 
