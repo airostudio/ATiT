@@ -2,7 +2,7 @@
 /*
 Plugin Name: Airo WooCommerce CSV Wizard
 Description: Wizard-style CSV importer for WooCommerce products with image checks, progress bar, and logging.
-Version: 2.1.0
+Version: 2.2.0
 Author: Airo Studio
 */
 
@@ -45,7 +45,7 @@ class Airo_WC_CSV_Wizard {
             return;
         }
 
-        wp_enqueue_style( 'airo-csv-wizard-styles', false, array(), '2.1.0' );
+        wp_enqueue_style( 'airo-csv-wizard-styles', false, array(), '2.2.0' );
         wp_add_inline_style( 'airo-csv-wizard-styles', $this->get_custom_css() );
     }
 
@@ -502,27 +502,127 @@ class Airo_WC_CSV_Wizard {
             letter-spacing: 0.5px;
         }
 
+        /* Current action indicator */
+        .wpai-current-action {
+            background: #f0f6fc;
+            border: 1px solid #c3c4c7;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .wpai-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid #e5e5e5;
+            border-top-color: #007cba;
+            border-radius: 50%;
+            animation: wpai-spin 0.8s linear infinite;
+        }
+
+        @keyframes wpai-spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .wpai-current-action-text {
+            flex: 1;
+            font-size: 13px;
+            color: #23282d;
+        }
+
+        .wpai-current-action-text strong {
+            color: #007cba;
+        }
+
+        .wpai-current-action.done {
+            background: #edfaef;
+            border-color: #46b450;
+        }
+
+        .wpai-current-action.done .wpai-spinner {
+            border-color: #46b450;
+            border-top-color: #46b450;
+            animation: none;
+        }
+
+        .wpai-current-action.done .wpai-spinner::after {
+            content: "✓";
+            display: block;
+            text-align: center;
+            line-height: 16px;
+            color: #46b450;
+            font-weight: bold;
+        }
+
         /* Log output */
         .wpai-log {
-            background: #23282d;
-            color: #ccc;
-            padding: 15px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 0;
             border-radius: 4px;
-            max-height: 300px;
+            max-height: 400px;
             overflow-y: auto;
-            font-family: Consolas, Monaco, monospace;
+            font-family: 'SF Mono', Consolas, Monaco, 'Courier New', monospace;
             font-size: 12px;
-            line-height: 1.6;
+            line-height: 1.5;
+            border: 1px solid #333;
         }
 
         .wpai-log-item {
-            padding: 3px 0;
+            padding: 6px 12px;
+            border-bottom: 1px solid #2d2d2d;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
         }
 
-        .wpai-log-item.created { color: #46b450; }
-        .wpai-log-item.updated { color: #00a0d2; }
-        .wpai-log-item.skipped { color: #dba617; }
-        .wpai-log-item.error { color: #dc3232; }
+        .wpai-log-item:last-child {
+            border-bottom: none;
+        }
+
+        .wpai-log-item:hover {
+            background: #252525;
+        }
+
+        .wpai-log-time {
+            color: #6a9955;
+            font-size: 11px;
+            flex-shrink: 0;
+            min-width: 70px;
+        }
+
+        .wpai-log-icon {
+            flex-shrink: 0;
+            width: 16px;
+            text-align: center;
+        }
+
+        .wpai-log-msg {
+            flex: 1;
+            word-break: break-word;
+        }
+
+        .wpai-log-item.info { color: #9cdcfe; }
+        .wpai-log-item.info .wpai-log-icon { color: #569cd6; }
+        .wpai-log-item.created { color: #4ec9b0; }
+        .wpai-log-item.created .wpai-log-icon { color: #4ec9b0; }
+        .wpai-log-item.updated { color: #dcdcaa; }
+        .wpai-log-item.updated .wpai-log-icon { color: #dcdcaa; }
+        .wpai-log-item.skipped { color: #ce9178; }
+        .wpai-log-item.skipped .wpai-log-icon { color: #ce9178; }
+        .wpai-log-item.error { color: #f14c4c; }
+        .wpai-log-item.error .wpai-log-icon { color: #f14c4c; }
+        .wpai-log-item.image { color: #c586c0; }
+        .wpai-log-item.image .wpai-log-icon { color: #c586c0; }
+        .wpai-log-item.category { color: #4fc1ff; }
+        .wpai-log-item.category .wpai-log-icon { color: #4fc1ff; }
+        .wpai-log-item.meta { color: #b5cea8; }
+        .wpai-log-item.meta .wpai-log-icon { color: #b5cea8; }
+        .wpai-log-item.start { color: #569cd6; background: #1a3a52; }
+        .wpai-log-item.complete { color: #4ec9b0; background: #1a3a2a; }
 
         /* Notice boxes */
         .wpai-notice {
@@ -1007,11 +1107,18 @@ class Airo_WC_CSV_Wizard {
             <h2>Step 4: Importing...</h2>
         </div>
         <div class="wpai-body">
+            <div class="wpai-current-action" id="wpai-current-action">
+                <div class="wpai-spinner"></div>
+                <div class="wpai-current-action-text" id="wpai-current-text">
+                    Initializing import...
+                </div>
+            </div>
+
             <div class="wpai-progress">
                 <div class="wpai-progress-bar">
                     <div class="wpai-progress-fill" id="wpai-progress" style="width: 0%;">0%</div>
                 </div>
-                <div class="wpai-progress-text" id="wpai-status">Starting import...</div>
+                <div class="wpai-progress-text" id="wpai-status">Preparing to process <?php echo intval( $total_rows ); ?> products...</div>
             </div>
 
             <div class="wpai-results">
@@ -1033,23 +1140,63 @@ class Airo_WC_CSV_Wizard {
         </div>
 
         <script>
+        var wpaiIcons = {
+            'info': 'ℹ',
+            'start': '▶',
+            'created': '✓',
+            'updated': '↻',
+            'skipped': '⊘',
+            'error': '✕',
+            'image': '🖼',
+            'category': '📁',
+            'meta': '⚙',
+            'complete': '★',
+            'field': '•'
+        };
+
         window.wpaiUpdate = function(done, total, created, updated, skipped, action, name) {
             var pct = total ? Math.round(done / total * 100) : 0;
             document.getElementById('wpai-progress').style.width = pct + '%';
             document.getElementById('wpai-progress').textContent = pct + '%';
-            document.getElementById('wpai-status').textContent = done + ' of ' + total + ' processed';
+            document.getElementById('wpai-status').textContent = done + ' of ' + total + ' products processed';
             document.getElementById('wpai-created').textContent = created;
             document.getElementById('wpai-updated').textContent = updated;
             document.getElementById('wpai-skipped').textContent = skipped;
+        };
 
-            if (name) {
-                var log = document.getElementById('wpai-log');
-                var item = document.createElement('div');
-                item.className = 'wpai-log-item ' + action;
-                item.textContent = (action === 'created' ? '+ ' : action === 'updated' ? '~ ' : '- ') + name;
-                log.appendChild(item);
-                log.scrollTop = log.scrollHeight;
-            }
+        window.wpaiAction = function(text) {
+            document.getElementById('wpai-current-text').innerHTML = text;
+        };
+
+        window.wpaiLog = function(type, message, timestamp) {
+            var log = document.getElementById('wpai-log');
+            var item = document.createElement('div');
+            item.className = 'wpai-log-item ' + type;
+
+            var time = document.createElement('span');
+            time.className = 'wpai-log-time';
+            time.textContent = timestamp || '';
+
+            var icon = document.createElement('span');
+            icon.className = 'wpai-log-icon';
+            icon.textContent = wpaiIcons[type] || '•';
+
+            var msg = document.createElement('span');
+            msg.className = 'wpai-log-msg';
+            msg.textContent = message;
+
+            item.appendChild(time);
+            item.appendChild(icon);
+            item.appendChild(msg);
+            log.appendChild(item);
+            log.scrollTop = log.scrollHeight;
+        };
+
+        window.wpaiComplete = function() {
+            var actionBox = document.getElementById('wpai-current-action');
+            actionBox.classList.add('done');
+            document.getElementById('wpai-current-text').innerHTML = '<strong>Import Complete!</strong> All products have been processed.';
+            document.querySelector('.wpai-header h2').textContent = 'Import Complete!';
         };
         </script>
         <?php
@@ -1060,6 +1207,8 @@ class Airo_WC_CSV_Wizard {
         $log_url = $this->get_log_file_url();
         ?>
 
+        <script>if(window.wpaiComplete)wpaiComplete();</script>
+
         <div class="wpai-buttons">
             <?php if ( $log_url ) : ?>
             <a href="<?php echo esc_url( $log_url ); ?>" class="wpai-btn wpai-btn-secondary" target="_blank">Download Log</a>
@@ -1068,10 +1217,6 @@ class Airo_WC_CSV_Wizard {
             <?php endif; ?>
             <a href="<?php echo esc_url( add_query_arg( array( 'page' => self::PAGE_SLUG, 'step' => 1 ), admin_url( 'admin.php' ) ) ); ?>" class="wpai-btn wpai-btn-primary">New Import</a>
         </div>
-
-        <script>
-        document.querySelector('.wpai-header h2').textContent = 'Import Complete!';
-        </script>
         <?php
     }
 
@@ -1085,8 +1230,13 @@ class Airo_WC_CSV_Wizard {
         $download_images = ! empty( $options['download_images'] );
         $image_base_url  = isset( $options['image_base_url'] ) ? $options['image_base_url'] : '';
 
+        // Log import start
+        $this->echo_log( 'start', 'Starting import from ' . basename( $file_path ) );
+        $this->echo_log( 'info', 'Mode: ' . $mode . ' | Match by: ' . $match_by );
+
         if ( ( $handle = fopen( $file_path, 'r' ) ) === false ) {
             $this->log_line( 'ERROR: Cannot open CSV file.' );
+            $this->echo_log( 'error', 'Cannot open CSV file' );
             return compact( 'created', 'updated', 'skipped' );
         }
 
@@ -1094,10 +1244,13 @@ class Airo_WC_CSV_Wizard {
         if ( ! $headers ) {
             fclose( $handle );
             $this->log_line( 'ERROR: Empty CSV.' );
+            $this->echo_log( 'error', 'Empty CSV file - no headers found' );
             return compact( 'created', 'updated', 'skipped' );
         }
 
         $this->log_line( 'Headers: ' . implode( ', ', $headers ) );
+        $this->echo_log( 'info', 'Found ' . count( $headers ) . ' columns: ' . implode( ', ', array_slice( $headers, 0, 5 ) ) . ( count( $headers ) > 5 ? '...' : '' ) );
+        $this->echo_log( 'info', 'Processing ' . $total_rows . ' products...' );
 
         while ( ( $row = fgetcsv( $handle, 0, ',' ) ) !== false ) {
             if ( count( array_filter( $row, 'strlen' ) ) === 0 ) continue;
@@ -1113,12 +1266,16 @@ class Airo_WC_CSV_Wizard {
             if ( $name === '' ) {
                 $processed++; $skipped++;
                 $this->log_line( 'Skipped: no name' );
+                $this->echo_log( 'skipped', 'Row ' . ( $processed ) . ': Skipped - no product name' );
                 $this->echo_progress( $processed, $total_rows, $created, $updated, $skipped, 'skipped', '(no name)' );
                 continue;
             }
 
             $sku_idx = $this->mapping_index( $mapping, 'sku' );
             $sku     = $sku_idx !== null && isset( $row_data[ $sku_idx ] ) ? trim( $row_data[ $sku_idx ] ) : '';
+
+            // Update current action
+            $this->echo_action( 'Processing <strong>' . esc_html( $name ) . '</strong>' . ( $sku ? ' (SKU: ' . esc_html( $sku ) . ')' : '' ) . ' — row ' . ( $processed + 1 ) . ' of ' . $total_rows );
 
             $product_id = 0;
             if ( 'sku' === $match_by && $sku !== '' ) {
@@ -1138,48 +1295,72 @@ class Airo_WC_CSV_Wizard {
                 if ( 'create_only' === $mode ) {
                     $processed++; $skipped++;
                     $this->log_line( 'Skipped existing: ' . $name );
+                    $this->echo_log( 'skipped', $name . ' — product exists, skipping (create-only mode)' );
                     $this->echo_progress( $processed, $total_rows, $created, $updated, $skipped, 'skipped', $name );
                     continue;
                 }
                 $product = wc_get_product( $product_id );
+                $this->echo_log( 'info', 'Found existing product ID ' . $product_id . ' — will update' );
             } else {
                 if ( 'update_only' === $mode ) {
                     $processed++; $skipped++;
                     $this->log_line( 'Skipped new: ' . $name );
+                    $this->echo_log( 'skipped', $name . ' — new product, skipping (update-only mode)' );
                     $this->echo_progress( $processed, $total_rows, $created, $updated, $skipped, 'skipped', $name );
                     continue;
                 }
                 $product = new WC_Product_Simple();
+                $this->echo_log( 'info', 'Creating new product: ' . $name );
             }
 
             if ( ! $product ) {
                 $processed++; $skipped++;
+                $this->echo_log( 'error', 'Failed to load/create product object' );
                 $this->echo_progress( $processed, $total_rows, $created, $updated, $skipped, 'skipped', $name );
                 continue;
             }
 
             $product->set_name( $name );
 
+            // Description
             $desc_idx = $this->mapping_index( $mapping, 'description' );
-            if ( $desc_idx !== null && isset( $row_data[ $desc_idx ] ) ) $product->set_description( $row_data[ $desc_idx ] );
+            if ( $desc_idx !== null && isset( $row_data[ $desc_idx ] ) && $row_data[ $desc_idx ] !== '' ) {
+                $product->set_description( $row_data[ $desc_idx ] );
+            }
 
+            // Short description
             $short_idx = $this->mapping_index( $mapping, 'short_description' );
-            if ( $short_idx !== null && isset( $row_data[ $short_idx ] ) ) $product->set_short_description( $row_data[ $short_idx ] );
+            if ( $short_idx !== null && isset( $row_data[ $short_idx ] ) && $row_data[ $short_idx ] !== '' ) {
+                $product->set_short_description( $row_data[ $short_idx ] );
+            }
 
+            // Status
             $status_idx = $this->mapping_index( $mapping, 'status' );
             $status_raw = $status_idx !== null && isset( $row_data[ $status_idx ] ) ? strtolower( trim( $row_data[ $status_idx ] ) ) : 'publish';
             $product->set_status( in_array( $status_raw, array( 'publish', 'draft', 'pending' ), true ) ? $status_raw : 'publish' );
 
+            // SKU
             if ( $sku !== '' ) {
-                try { $product->set_sku( $sku ); } catch ( WC_Data_Exception $e ) { $this->log_line( 'SKU error: ' . $e->getMessage() ); }
+                try {
+                    $product->set_sku( $sku );
+                } catch ( WC_Data_Exception $e ) {
+                    $this->log_line( 'SKU error: ' . $e->getMessage() );
+                    $this->echo_log( 'error', 'SKU "' . $sku . '" error: ' . $e->getMessage() );
+                }
             }
 
+            // Prices
             $reg_idx = $this->mapping_index( $mapping, 'regular_price' );
-            if ( $reg_idx !== null && isset( $row_data[ $reg_idx ] ) && $row_data[ $reg_idx ] !== '' ) $product->set_regular_price( trim( $row_data[ $reg_idx ] ) );
+            if ( $reg_idx !== null && isset( $row_data[ $reg_idx ] ) && $row_data[ $reg_idx ] !== '' ) {
+                $product->set_regular_price( trim( $row_data[ $reg_idx ] ) );
+            }
 
             $sale_idx = $this->mapping_index( $mapping, 'sale_price' );
-            if ( $sale_idx !== null && isset( $row_data[ $sale_idx ] ) && $row_data[ $sale_idx ] !== '' ) $product->set_sale_price( trim( $row_data[ $sale_idx ] ) );
+            if ( $sale_idx !== null && isset( $row_data[ $sale_idx ] ) && $row_data[ $sale_idx ] !== '' ) {
+                $product->set_sale_price( trim( $row_data[ $sale_idx ] ) );
+            }
 
+            // Stock
             $stock_idx = $this->mapping_index( $mapping, 'stock_quantity' );
             if ( $stock_idx !== null && isset( $row_data[ $stock_idx ] ) && $row_data[ $stock_idx ] !== '' ) {
                 $qty = (int) $row_data[ $stock_idx ];
@@ -1189,52 +1370,102 @@ class Airo_WC_CSV_Wizard {
             }
 
             $existing = (bool) $product_id;
-            try { $saved_id = $product->save(); } catch ( WC_Data_Exception $e ) {
+
+            // Save product
+            $this->echo_action( 'Saving <strong>' . esc_html( $name ) . '</strong> to database...' );
+            try {
+                $saved_id = $product->save();
+            } catch ( WC_Data_Exception $e ) {
                 $processed++; $skipped++;
                 $this->log_line( 'Save error: ' . $e->getMessage() );
+                $this->echo_log( 'error', 'Failed to save ' . $name . ': ' . $e->getMessage() );
                 $this->echo_progress( $processed, $total_rows, $created, $updated, $skipped, 'skipped', $name );
                 continue;
             }
 
             if ( ! $saved_id ) {
                 $processed++; $skipped++;
+                $this->echo_log( 'error', 'Failed to save product - no ID returned' );
                 $this->echo_progress( $processed, $total_rows, $created, $updated, $skipped, 'skipped', $name );
                 continue;
             }
 
+            // Categories
             $cat_idx = $this->mapping_index( $mapping, 'categories' );
             if ( $cat_idx !== null && isset( $row_data[ $cat_idx ] ) && $row_data[ $cat_idx ] !== '' ) {
-                $this->assign_categories( $saved_id, $row_data[ $cat_idx ], $category_delim );
+                $cat_names = $row_data[ $cat_idx ];
+                $this->echo_action( 'Assigning categories for <strong>' . esc_html( $name ) . '</strong>...' );
+                $cat_count = $this->assign_categories( $saved_id, $cat_names, $category_delim );
+                if ( $cat_count > 0 ) {
+                    $this->echo_log( 'category', $name . ' — assigned to ' . $cat_count . ' categories' );
+                }
             }
 
+            // Images
             $img_idx = $this->mapping_index( $mapping, 'images' );
             if ( $download_images && $img_idx !== null && isset( $row_data[ $img_idx ] ) && $row_data[ $img_idx ] !== '' ) {
-                $this->handle_images( $saved_id, $row_data[ $img_idx ], $image_base_url );
+                $this->echo_action( 'Downloading images for <strong>' . esc_html( $name ) . '</strong>...' );
+                $img_count = $this->handle_images( $saved_id, $row_data[ $img_idx ], $image_base_url, $name );
             }
 
+            // Custom meta
             if ( ! empty( $custom_meta ) ) {
+                $meta_count = 0;
                 foreach ( $custom_meta as $m ) {
                     if ( empty( $m['key'] ) || $m['column'] === '' ) continue;
                     $col = $m['column'];
                     if ( isset( $row_data[ $col ] ) ) {
                         update_post_meta( $saved_id, sanitize_key( $m['key'] ), sanitize_text_field( $row_data[ $col ] ) );
+                        $meta_count++;
                     }
+                }
+                if ( $meta_count > 0 ) {
+                    $this->echo_log( 'meta', $name . ' — saved ' . $meta_count . ' custom meta fields' );
                 }
             }
 
-            if ( $existing ) { $updated++; $action = 'updated'; $this->log_line( 'Updated: ' . $name ); }
-            else { $created++; $action = 'created'; $this->log_line( 'Created: ' . $name ); }
+            // Final result
+            if ( $existing ) {
+                $updated++;
+                $action = 'updated';
+                $this->log_line( 'Updated: ' . $name );
+                $this->echo_log( 'updated', $name . ' — updated successfully (ID: ' . $saved_id . ')' );
+            } else {
+                $created++;
+                $action = 'created';
+                $this->log_line( 'Created: ' . $name );
+                $this->echo_log( 'created', $name . ' — created successfully (ID: ' . $saved_id . ')' );
+            }
 
             $processed++;
             $this->echo_progress( $processed, $total_rows, $created, $updated, $skipped, $action, $name );
         }
 
         fclose( $handle );
+
+        // Final summary
+        $this->echo_log( 'complete', 'Import finished! Created: ' . $created . ', Updated: ' . $updated . ', Skipped: ' . $skipped );
+
         return compact( 'created', 'updated', 'skipped' );
     }
 
     private function echo_progress( $done, $total, $created, $updated, $skipped, $action, $name ) {
         echo '<script>if(window.wpaiUpdate)wpaiUpdate(' . intval($done) . ',' . intval($total) . ',' . intval($created) . ',' . intval($updated) . ',' . intval($skipped) . ',"' . esc_js($action) . '","' . esc_js($name) . '");</script>';
+        $this->do_flush();
+    }
+
+    private function echo_action( $text ) {
+        echo '<script>if(window.wpaiAction)wpaiAction("' . esc_js( $text ) . '");</script>';
+        $this->do_flush();
+    }
+
+    private function echo_log( $type, $message ) {
+        $timestamp = gmdate( 'H:i:s' );
+        echo '<script>if(window.wpaiLog)wpaiLog("' . esc_js( $type ) . '","' . esc_js( $message ) . '","' . esc_js( $timestamp ) . '");</script>';
+        $this->do_flush();
+    }
+
+    private function do_flush() {
         if ( ob_get_level() > 0 ) ob_flush();
         flush();
     }
@@ -1312,7 +1543,7 @@ class Airo_WC_CSV_Wizard {
 
     private function assign_categories( $product_id, $raw, $delim ) {
         $parts = array_filter( array_map( 'trim', explode( $delim, $raw ) ) );
-        if ( empty( $parts ) ) return;
+        if ( empty( $parts ) ) return 0;
         $term_ids = array();
         foreach ( $parts as $name ) {
             $term = term_exists( $name, 'product_cat' );
@@ -1320,36 +1551,64 @@ class Airo_WC_CSV_Wizard {
             if ( ! is_wp_error( $term ) && isset( $term['term_id'] ) ) $term_ids[] = (int) $term['term_id'];
         }
         if ( $term_ids ) wp_set_object_terms( $product_id, $term_ids, 'product_cat' );
+        return count( $term_ids );
     }
 
-    private function handle_images( $product_id, $raw, $base_url ) {
+    private function handle_images( $product_id, $raw, $base_url, $product_name = '' ) {
         $parts = array_filter( array_map( 'trim', explode( ',', str_replace( array( '|', ';' ), ',', $raw ) ) ) );
-        if ( empty( $parts ) ) return;
+        if ( empty( $parts ) ) return 0;
         if ( ! $base_url ) $base_url = site_url( '/wp-content/uploads/airo_uploads/' );
 
         require_once ABSPATH . 'wp-admin/includes/media.php';
         require_once ABSPATH . 'wp-admin/includes/file.php';
         require_once ABSPATH . 'wp-admin/includes/image.php';
 
+        $total_images = count( $parts );
         $ids = array();
+        $current = 0;
+
         foreach ( $parts as $img ) {
+            $current++;
             $url = strpos( $img, 'http' ) === 0 ? $img : trailingslashit( $base_url ) . ltrim( $img, '/\\' );
+            $filename = basename( parse_url( $url, PHP_URL_PATH ) );
+
+            // Update action to show image progress
+            $this->echo_action( 'Downloading image ' . $current . ' of ' . $total_images . ' for <strong>' . esc_html( $product_name ) . '</strong>: ' . esc_html( $filename ) );
+
             $response = wp_remote_head( $url, array( 'timeout' => 10 ) );
             if ( is_wp_error( $response ) || wp_remote_retrieve_response_code( $response ) !== 200 ) {
                 $this->log_line( 'Image not found: ' . $url );
+                $this->echo_log( 'error', 'Image not found: ' . $filename );
                 continue;
             }
+
             $tmp = download_url( $url, 30 );
-            if ( is_wp_error( $tmp ) ) { $this->log_line( 'Download failed: ' . $url ); continue; }
-            $attach_id = media_handle_sideload( array( 'name' => basename( parse_url( $url, PHP_URL_PATH ) ), 'tmp_name' => $tmp ), $product_id );
-            if ( is_wp_error( $attach_id ) ) { @unlink( $tmp ); continue; }
+            if ( is_wp_error( $tmp ) ) {
+                $this->log_line( 'Download failed: ' . $url );
+                $this->echo_log( 'error', 'Failed to download: ' . $filename );
+                continue;
+            }
+
+            $attach_id = media_handle_sideload( array( 'name' => $filename, 'tmp_name' => $tmp ), $product_id );
+            if ( is_wp_error( $attach_id ) ) {
+                @unlink( $tmp );
+                $this->echo_log( 'error', 'Failed to attach: ' . $filename );
+                continue;
+            }
+
             $ids[] = $attach_id;
             $this->log_line( 'Image attached: ' . $url );
+            $this->echo_log( 'image', $product_name . ' — attached image: ' . $filename );
         }
+
         if ( $ids ) {
             set_post_thumbnail( $product_id, $ids[0] );
-            if ( count( $ids ) > 1 ) update_post_meta( $product_id, '_product_image_gallery', implode( ',', array_slice( $ids, 1 ) ) );
+            if ( count( $ids ) > 1 ) {
+                update_post_meta( $product_id, '_product_image_gallery', implode( ',', array_slice( $ids, 1 ) ) );
+            }
         }
+
+        return count( $ids );
     }
 
     /* Logging */
