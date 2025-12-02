@@ -1083,17 +1083,36 @@ class Airo_WC_CSV_Wizard {
 
     /* STEP 4: Run Import */
     private function step_run() {
-        if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( $_GET['_wpnonce'], 'airo_csv_run_import' ) ) {
+        // Check WooCommerce is available
+        if ( ! class_exists( 'WooCommerce' ) || ! function_exists( 'wc_get_product' ) ) {
             echo '<div class="wpai-header"><h2>Error</h2></div>';
-            echo '<div class="wpai-body"><div class="wpai-notice wpai-notice-error"><p>Security check failed.</p></div></div>';
+            echo '<div class="wpai-body"><div class="wpai-notice wpai-notice-error"><p>WooCommerce is not active or not fully loaded.</p></div></div>';
+            return;
+        }
+
+        if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'airo_csv_run_import' ) ) {
+            echo '<div class="wpai-header"><h2>Error</h2></div>';
+            echo '<div class="wpai-body"><div class="wpai-notice wpai-notice-error"><p>Security check failed. Please try again from the beginning.</p></div></div>';
             echo '<div class="wpai-buttons"><a href="' . esc_url( add_query_arg( array( 'page' => self::PAGE_SLUG, 'step' => 1 ), admin_url( 'admin.php' ) ) ) . '" class="wpai-btn wpai-btn-secondary">&larr; Start Over</a><div></div></div>';
             return;
         }
 
         $state = $this->get_state_from_request();
-        if ( ! $state || empty( $state['file'] ) || ! file_exists( $state['file'] ) ) {
+        if ( ! $state ) {
             echo '<div class="wpai-header"><h2>Error</h2></div>';
-            echo '<div class="wpai-body"><div class="wpai-notice wpai-notice-error"><p>Session lost or file not found.</p></div></div>';
+            echo '<div class="wpai-body"><div class="wpai-notice wpai-notice-error"><p>Session state could not be decoded. Please start over.</p></div></div>';
+            return;
+        }
+
+        if ( empty( $state['file'] ) ) {
+            echo '<div class="wpai-header"><h2>Error</h2></div>';
+            echo '<div class="wpai-body"><div class="wpai-notice wpai-notice-error"><p>No file specified in session state.</p></div></div>';
+            return;
+        }
+
+        if ( ! file_exists( $state['file'] ) ) {
+            echo '<div class="wpai-header"><h2>Error</h2></div>';
+            echo '<div class="wpai-body"><div class="wpai-notice wpai-notice-error"><p>CSV file not found: ' . esc_html( basename( $state['file'] ) ) . '</p></div></div>';
             return;
         }
 
@@ -1202,7 +1221,19 @@ class Airo_WC_CSV_Wizard {
         <?php
 
         $this->init_log_file();
-        $result = $this->run_import( $file, $mapping, $custom_meta, $options, $total_rows );
+
+        try {
+            $result = $this->run_import( $file, $mapping, $custom_meta, $options, $total_rows );
+        } catch ( Exception $e ) {
+            $this->echo_log( 'error', 'Fatal error: ' . $e->getMessage() );
+            $this->log_line( 'FATAL ERROR: ' . $e->getMessage() );
+            $result = array( 'created' => 0, 'updated' => 0, 'skipped' => 0 );
+        } catch ( Error $e ) {
+            $this->echo_log( 'error', 'Fatal error: ' . $e->getMessage() );
+            $this->log_line( 'FATAL ERROR: ' . $e->getMessage() );
+            $result = array( 'created' => 0, 'updated' => 0, 'skipped' => 0 );
+        }
+
         $this->close_log_file();
         $log_url = $this->get_log_file_url();
         ?>
@@ -1224,7 +1255,14 @@ class Airo_WC_CSV_Wizard {
     private function run_import( $file_path, $mapping, $custom_meta, $options, $total_rows = null ) {
         $created = $updated = $skipped = $processed = 0;
 
-        $mode            = isset( $options['mode'] ) ? $options['mode'] : 'create_update';
+        // Support both 'mode' and 'import_mode' keys for backwards compatibility
+        $mode = 'create_update';
+        if ( isset( $options['mode'] ) ) {
+            $mode = $options['mode'];
+        } elseif ( isset( $options['import_mode'] ) ) {
+            $mode = $options['import_mode'];
+        }
+
         $match_by        = isset( $options['match_by'] ) ? $options['match_by'] : 'sku';
         $category_delim  = isset( $options['category_delim'] ) ? $options['category_delim'] : ',';
         $download_images = ! empty( $options['download_images'] );
