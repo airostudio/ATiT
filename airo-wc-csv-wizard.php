@@ -565,7 +565,7 @@ class Airo_WC_CSV_Wizard {
             border-radius: 4px;
             max-height: 400px;
             overflow-y: auto;
-            font-family: 'SF Mono', Consolas, Monaco, 'Courier New', monospace;
+            font-family: "SF Mono", Consolas, Monaco, "Courier New", monospace;
             font-size: 12px;
             line-height: 1.5;
             border: 1px solid #333;
